@@ -28,18 +28,29 @@ Go to your github account and add a new application under your github org. (http
 Make note of the ID and Secret you're given. You'll need those.
 
 # Configuration
+
+## OAuth Config
+
+Before you push the nginx server you need to set the following nginx vars:
+
+- ``$oauth_id`` Github client id
+- ``$oauth_secret`` Github client secret
+- ``$oauth_orgs_whitelist`` Github org to allow to access the app
+- ``$oauth_scope`` Github scope access for oauth token
+
+You set these values on your instance by as such.
+
+    set $oauth_id             'MY_GITHUB_APP_ID';
+    set $oauth_secret         'MY_GITHUB_APP_SECRET';
+    set $oauth_orgs_whitelist '{"MY_GITHUB_ORG": true}';
+    set $oauth_scope          'repo,user,user:email';
+
+
 If you just want a simple test, it's pretty straightforward.
 
 - install the package
 - edit `/opt/nginx/etc/nginx.conf` with the attached conf file
-- edit `/opt/nginx/etc/access.lua` with the attach lua script making the appropriate changes noted below
 
-```lua
-local oauth = {
-    app_id = "MY_GITHUB_APP_ID",
-    app_secret = "MY_GITHUB_APP_SECRET",
-    orgs_whitelist = {["MY_GITHUB_ORG"]=true},
-```
 
 Note that org names are case-sensitive.
 

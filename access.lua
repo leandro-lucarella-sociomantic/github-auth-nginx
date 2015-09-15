@@ -21,11 +21,11 @@ ngx.log(ngx.INFO, block, "Using github_api_uri="..github_api_uri)
 -- TODO: make this an oauth lib
 -- note that org names are case-sensitive
 local oauth = {
-    app_id = "MY_GITHUB_APP_ID",
-    app_secret = "MY_GITHUB_APP_SECRET",
-    orgs_whitelist = {["MY_GITHUB_ORG"]=true},
+    app_id = ngx.var.oauth_id,
+    app_secret = ngx.var.oauth_secret,
+    orgs_whitelist = cjson.decode(ngx.var.oauth_orgs_whitelist),
 
-    scope = "repo,user,user:email",
+    scope = ngx.var.oauth_scope,
     authorize_base_url = github_uri.."/login/oauth/authorize",
     access_token_url = github_uri.."/login/oauth/access_token",
     user_orgs_url = github_api_uri.."/user/orgs",
