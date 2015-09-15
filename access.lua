@@ -125,16 +125,12 @@ end
 -- extract previous token from cookie if it is there
 local access_token = ngx.var.cookie_NGAccessToken or nil
 local authorized = ngx.var.cookie_NGAuthorized or nil
-local redirect_back = ngx.var.cookie_NGRedirectBack or ngx.var.uri
-redirect_back = (string.match(redirect_back, "/_callback%??.*")) and "/" or redirect_back
-ngx.log(ngx.INFO, block, "redirect_back0=", redirect_back)
 
 if access_token == "" then access_token = nil end
 if authorized ~= "true" then authorized = nil end
 
 if access_token then set_cookie('NGAccessToken', access_token, cookie_jar) end
 if authorized then set_cookie('NGAuthorized', authorized, cookie_jar) end
-if redirect_back then set_cookie('NGRedirectBack', redirect_back, cookie_jar, 120) end
 
 -- We have nothing, do it all
 if authorized ~= "true" or not access_token then
@@ -163,7 +159,11 @@ if authorized ~= "true" or not access_token then
 
         -- both the cookie and proxy_pass token retrieval failed
         if not access_token then
-            ngx.log(ngx.INFO, block, 'no access_token')
+            local redirect_back = ngx.var.cookie_NGRedirectBack or ngx.var.uri
+            redirect_back = (string.match(redirect_back, "/_callback%??.*")) and "/" or redirect_back
+            ngx.log(ngx.INFO, block, "redirect_back1=", redirect_back)
+
+            if redirect_back then set_cookie('NGRedirectBack', redirect_back, cookie_jar, 120) end
 
             -- Redirect to the /oauth endpoint, request access to ALL scopes
             set_cookies(cookie_jar)
@@ -204,6 +204,7 @@ if authorized ~= "true" then
         del_cookie('NGAuthorized', cookie_jar)
 
         -- Disallow access
+        ngx.log(ngx.ERR, "Unauthorized access: ", token)
         ngx.status = ngx.HTTP_UNAUTHORIZED
         ngx.say('{"status": 403, "message": "USER_ID "'..access_token..'" has no access to this resource"}')
 
@@ -218,7 +219,6 @@ end
 -- should be authorized by now
 
 -- Support redirection back to your request if necessary
-ngx.log(ngx.INFO, block, "redirect_back1=", redirect_back)
 local redirect_back = ngx.var.cookie_NGRedirectBack
 ngx.log(ngx.INFO, block, "redirect_back2=", redirect_back)
 
