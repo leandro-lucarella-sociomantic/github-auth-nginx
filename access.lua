@@ -1,3 +1,5 @@
+require("resty.core")
+
 -- handles all the authentication, don't touch me
 -- skip favicon
 local block = ""

@@ -9,14 +9,13 @@ From there it was a matter of patching up the omnibus repo to bring it to curren
 
 
 # Requirements
-## Software
-You'll either need to build your own nginx packages from here:
-- https://github.com/bakins/omnibus-nginx
 
-or you can grab mine from here:
-- https://app.box.com/s/ji0kpu8ybkcd4asoitse (nginx_1.2.8-1.ubuntu.12.04_amd64.deb)
+## OAuth Plugin dependency
 
-These are omnibus builds of nginx + openresty created by @bakins. They have pretty much everything you need to get started to do some fancy lua application related stuff right in nginx.
+- https://github.com/openresty/lua-resty-core
+- https://github.com/brunoos/luasec 0.4.1+ (for ssl.https), 0.4.0 - untested.
+- https://github.com/diegonehab/luasocket 3.0-rc1
+- luajit 2.1 (2.0 - untested, because 2.1 is recomended by nginx-lua plugin and openresty)
 
 ## GitHub application
 Go to your github account and add a new application under your github org. (https://github.com/organizations/ORGNAME/settings/applications/)
@@ -53,18 +52,6 @@ If you just want a simple test, it's pretty straightforward.
 
 
 Note that org names are case-sensitive.
-
-# Start nginx (this will start in the foreground)
-```bash
-cd /opt/nginx/
-sudo LD_PRELOAD=/opt/nginx/lib/libmmap_lowmem.so nginx -c /opt/nginx/etc/nginx.conf -p /opt/nginx/etc/
-```
-
-In another window, you might want to `tail -f /opt/nginx/log/*`
-
-Load up the site in your browser. You should get redirected to github to authorize the application. After you auth, you'll get redirected BACK to your site (and will likely get a 404 since we don't actually have any content to serve).
-
-This is just a POC really. You'll want to likely tweek the `access.lua` appropriately and maybe even restrict access to a given repository.
 
 # References
 I got most of the inspiration (okay all of it) from a shitload of other people. Here are the big ones in no specific order
