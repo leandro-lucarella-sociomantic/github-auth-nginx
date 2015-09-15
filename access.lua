@@ -18,12 +18,6 @@ local github_api_uri = "https://api.github.com"
 ngx.log(ngx.INFO, block, "Using github_uri="..github_uri)
 ngx.log(ngx.INFO, block, "Using github_api_uri="..github_api_uri)
 
-local function pt(t)
-  s = ""
-  for k,v in pairs(t) do s=s.."("..k..","..v.."), " end
-  ngx.log(ngx.INFO, block, s)
-end
-
 -- TODO: make this an oauth lib
 -- note that org names are case-sensitive
 local oauth = {
