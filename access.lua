@@ -31,6 +31,7 @@ local oauth = {
     authorize_base_url = github_uri.."/login/oauth/authorize",
     access_token_url = github_uri.."/login/oauth/access_token",
     user_orgs_url = github_api_uri.."/user/orgs",
+    user_url = github_api_uri.."/user",
 }
 
 oauth.authorize_url = oauth.authorize_base_url.."?client_id="..oauth.app_id.."&scope="..oauth.scope
@@ -76,6 +77,18 @@ function oauth.get_access_token(code)
     return oauth.get(url_string)
 end
 
+function oauth.get_user_info(access_token)
+    local params = {access_token=access_token}
+    local url_string = oauth.user_url.."?"..ngx.encode_args(params)
+    local response = oauth.get(url_string)
+    local body = response.body
+
+    if body.error then
+        return {status=401, message=body.error}
+    end
+
+    return {status=200, body={access_token=access_token, login=body.login}}
+end
 
 function oauth.verify_user(access_token)
     local params = {access_token=access_token}
@@ -127,12 +140,15 @@ end
 -- extract previous token from cookie if it is there
 local access_token = ngx.var.cookie_NGAccessToken or nil
 local authorized = ngx.var.cookie_NGAuthorized or nil
+local auth_user = ngx.var.cookie_NGAuthUser or nil
 
 if access_token == "" then access_token = nil end
 if authorized ~= "true" then authorized = nil end
+if auth_user == "" then auth_user = nil end
 
 if access_token then set_cookie('NGAccessToken', access_token, cookie_jar) end
 if authorized then set_cookie('NGAuthorized', authorized, cookie_jar) end
+if auth_user then set_cookie('NGAuthUser', auth_user, cookie_jar) end
 
 -- We have nothing, do it all
 if authorized ~= "true" or not access_token then
@@ -179,6 +195,15 @@ if authorized ~= "true" then
     block = "[B]"
     ngx.log(ngx.INFO, block, 'authorized=', authorized)
     ngx.log(ngx.INFO, block, 'access_token=', access_token)
+    -- check is we have capability to get user login
+    local user_info = oauth.get_user_info(access_token)
+    if user_info.status ~= 200 then
+        auth_user = "unknown"
+    else
+        auth_user = user_info.body.login
+    end
+    set_cookie('NGAuthUser', auth_user, cookie_jar)
+
     -- ensure we have a user with the proper access app-level
     local verify_user_response = oauth.verify_user(access_token)
     if verify_user_response.status ~= 200 then
@@ -229,6 +254,7 @@ if redirect_back then
     del_cookie('NGRedirectBack', cookie_jar)
     return ngx.redirect(redirect_back)
 end
+ngx.var.auth_user = auth_user or "unknown"
 ngx.log(ngx.INFO, block, "--------------------------------------------------------------------------------")
 
 -- Set some headers for use within the protected endpoint

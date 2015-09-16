@@ -1,13 +1,3 @@
-# Reasoning
-While authing against our Google Apps domain has worked pretty well up until now, we really needed a way to auth against out Github organization. Not everyone who is accessing some of our protected development content has an email account in our Google Apps domain. They do, however, have access to our github org.
-
-Sadly it seems that apache and nginx modules for doing oauth are lacking.
-
-I was hoping to avoid the whole lua approach (and `mod_authnz_external` was a no go from the start). However I realized that Brian Akins (@bakins) had done some fancy omnibus work that got me 90% of the way there.
-
-From there it was a matter of patching up the omnibus repo to bring it to current versions as well as adding in a few additional components.
-
-
 # Requirements
 
 ## OAuth Plugin dependency
@@ -44,7 +34,6 @@ You set these values on your instance by as such.
     set $oauth_orgs_whitelist '{"MY_GITHUB_ORG": true}';
     set $oauth_scope          'repo,user,user:email';
 
-
 If you just want a simple test, it's pretty straightforward.
 
 - install the package
@@ -53,11 +42,18 @@ If you just want a simple test, it's pretty straightforward.
 
 Note that org names are case-sensitive.
 
-# References
-I got most of the inspiration (okay all of it) from a shitload of other people. Here are the big ones in no specific order
+## OAuth exported variables
 
-- https://github.com/bakins/omnibus-nginx
-- http://seatgeek.com/blog/dev/oauth-support-for-nginx-with-lua
-- https://github.com/NorthIsUp/nginx-oauth-on-dotcloud
+OAuth sets variable ``auth_user`` with user's login (if available, otherwise it is set to "unknown"). You can use this variables inside your application:
 
-I'm actually pretty excited about the openresty stuff but really the ability to extend nginx generically with lua is pretty awesome too.
+    location / {
+        set $auth_user 'unknown';
+
+        lua_need_request_body on;
+        access_by_lua_file "/etc/nginx/access.lua";
+
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_param AUTH_USER $auth_user;
+        fastcgi_param REMOTE_USER $auth_user;
+    }
+
