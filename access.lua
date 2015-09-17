@@ -116,13 +116,22 @@ end
 
 --- start session lib
 
+local function enabled(val)
+    if val == nil then return nil end
+    return val == true or (val == "1" or val == "true" or val == "on")
+end
+
 local session = {
     encode_chars = {["+"] = "-", ["/"] = "_", ["="] = "."},
     decode_chars = {["-"] = "+", ["_"] = "/", ["."] = "="},
 
     name = ngx.var.session_name or "session",
-    lifetime = tonumber(ngx.var.session_cookie_lifetime) or 3600,
-    data = {
+    cookie = {
+        domain = ngx.var.session_cookie_domain,
+        httponly = enabled(ngx.var.session_cookie_httponly or true),
+        lifetime = tonumber(ngx.var.session_cookie_lifetime) or 3600,
+        path = ngx.var.session_cookie_path or "/",
+    }, data = {
         access_token = nil,
         authorized = nil,
         auth_user = nil,
@@ -143,7 +152,20 @@ end
 function session:save()
     local data = cjson.encode(self.data)
     data = (ngx.encode_base64(data):gsub("[+/=]", self.encode_chars))
-    local cookie = { self.name, "=", data, "; path=/; Max-Age=", self.lifetime }
+    local cookie = { self.name, "=", data }
+    -- user set data
+    cookie[#cookie + 1] = "; Path="
+    cookie[#cookie + 1] = self.cookie.path
+    cookie[#cookie + 1] = "; Max-Age="
+    cookie[#cookie + 1] = self.cookie.lifetime
+    local domain = self.cookie.domain
+    if domain and domain ~= "localhost" and domain ~= "" then
+        cookie[#cookie + 1] = "; Domain="
+        cookie[#cookie + 1] = domain
+    end
+    if self.cookie.httponly then
+        cookie[#cookie + 1] = "; HttpOnly"
+    end
     ngx.header["Set-Cookie"] = table.concat(cookie)
 end
 

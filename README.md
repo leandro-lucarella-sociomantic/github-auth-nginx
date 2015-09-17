@@ -72,5 +72,8 @@ Here is a list of `session` related Nginx configuration variables that you can u
 
 ```nginx
 set $session_name              session;
+set $session_cookie_domain     mydomain.org;
 set $session_cookie_lifetime   3600;
+set $session_cookie_path       /;
+set $session_cookie_httponly   on;
 ```
