@@ -46,11 +46,12 @@ Note that org names are case-sensitive.
 
 ## OAuth exported variables
 
-OAuth sets variable ``auth_user`` with user's login (if available, otherwise it is set to "unknown"). You can use this variables inside your application:
+OAuth sets variable ``auth_user`` and ``auth_email`` with user's login and email (if availabe, otherwise they are set to "unknown"). You can use this variables inside your application:
 
 ```nginx
 location / {
     set $auth_user 'unknown';
+    set $auth_email 'unknown';
 
     lua_need_request_body on;
     access_by_lua_file "/etc/nginx/access.lua";
@@ -58,6 +59,7 @@ location / {
     fastcgi_pass 127.0.0.1:9000;
     fastcgi_param AUTH_USER $auth_user;
     fastcgi_param REMOTE_USER $auth_user;
+    fastcgi_param AUTH_EMAIL $auth_email;
 }
 ```
 

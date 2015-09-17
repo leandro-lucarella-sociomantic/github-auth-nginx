@@ -87,7 +87,7 @@ function oauth.get_user_info(access_token)
         return {status=401, message=body.error}
     end
 
-    return {status=200, body={access_token=access_token, login=body.login}}
+    return {status=200, body={access_token=access_token, login=body.login, email=body.email}}
 end
 
 function oauth.verify_user(access_token)
@@ -234,8 +234,10 @@ if authorized ~= "true" then
     local user_info = oauth.get_user_info(access_token)
     if user_info.status ~= 200 then
         session.data.login = "unknown"
+        session.data.email = "unknown"
     else
         session.data.login = user_info.body.login
+        session.data.email = user_info.body.email
     end
 
     -- ensure we have a user with the proper access app-level
@@ -292,6 +294,7 @@ if redirect_back then
     return ngx.redirect(redirect_back)
 end
 ngx.var.auth_user = session.data.login or "unknown"
+ngx.var.auth_email = session.data.email or "unknown"
 ngx.log(ngx.INFO, block, "--------------------------------------------------------------------------------")
 
 -- Set some headers for use within the protected endpoint
