@@ -29,10 +29,12 @@ Before you push the nginx server you need to set the following nginx vars:
 
 You set these values on your instance by as such.
 
-    set $oauth_id             'MY_GITHUB_APP_ID';
-    set $oauth_secret         'MY_GITHUB_APP_SECRET';
-    set $oauth_orgs_whitelist '{"MY_GITHUB_ORG": true}';
-    set $oauth_scope          'repo,user,user:email';
+```nginx
+set $oauth_id             'MY_GITHUB_APP_ID';
+set $oauth_secret         'MY_GITHUB_APP_SECRET';
+set $oauth_orgs_whitelist '{"MY_GITHUB_ORG": true}';
+set $oauth_scope          'repo,user,user:email';
+```
 
 If you just want a simple test, it's pretty straightforward.
 
@@ -46,14 +48,30 @@ Note that org names are case-sensitive.
 
 OAuth sets variable ``auth_user`` with user's login (if available, otherwise it is set to "unknown"). You can use this variables inside your application:
 
-    location / {
-        set $auth_user 'unknown';
+```nginx
+location / {
+    set $auth_user 'unknown';
 
-        lua_need_request_body on;
-        access_by_lua_file "/etc/nginx/access.lua";
+    lua_need_request_body on;
+    access_by_lua_file "/etc/nginx/access.lua";
 
-        fastcgi_pass 127.0.0.1:9000;
-        fastcgi_param AUTH_USER $auth_user;
-        fastcgi_param REMOTE_USER $auth_user;
-    }
+    fastcgi_pass 127.0.0.1:9000;
+    fastcgi_param AUTH_USER $auth_user;
+    fastcgi_param REMOTE_USER $auth_user;
+}
+```
 
+## Session Configuration Variables
+
+You can set default configuration parameters directly from Nginx configuration. It's **IMPORTANT** to understand
+that these are read only once (not on every request), for performance reasons. This is especially important if
+you run multiple sites (with different configurations) on the same Nginx server. You can of course set the common
+parameters on Nginx configuration even on that case.
+
+Here is a list of `lua-resty-session` related Nginx configuration variables that you can use to control
+`lua-resty-session`:
+
+```nginx
+set $session_name              session;
+set $session_cookie_lifetime   3600;
+```

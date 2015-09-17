@@ -9,7 +9,7 @@ if ngx.var.uri == "/favicon.ico" then return ngx.location.capture(ngx.var.uri) e
 ngx.log(ngx.INFO, block, "################################################################################")
 
 -- import requirements
-local cjson = require("cjson")
+local cjson = require("cjson.safe")
 local https = require("ssl.https")
 local url = require("socket.url")
 local ltn12 = require("ltn12")
@@ -114,41 +114,54 @@ end
 
 --- end oauth lib
 
+--- start session lib
+
+local session = {
+    encode_chars = {["+"] = "-", ["/"] = "_", ["="] = "."},
+    decode_chars = {["-"] = "+", ["_"] = "/", ["."] = "="},
+
+    name = ngx.var.session_name or "session",
+    lifetime = tonumber(ngx.var.session_cookie_lifetime) or 3600,
+    data = {
+        access_token = nil,
+        authorized = nil,
+        auth_user = nil,
+    },
+}
+
+function session:start()
+    local data = ngx.var["cookie_" .. self.name]
+    if data then
+        data = ngx.decode_base64((data:gsub("[-_.]", self.decode_chars)))
+        if data then
+            data = cjson.decode(data)
+            self.data = data or {}
+        end
+    end
+end
+
+function session:save()
+    local data = cjson.encode(self.data)
+    data = (ngx.encode_base64(data):gsub("[+/=]", self.encode_chars))
+    local cookie = { self.name, "=", data, "; path=/; Max-Age=", self.lifetime }
+    ngx.header["Set-Cookie"] = table.concat(cookie)
+end
+
+session:start()
+
+--- end session lib
+
 
 local args = ngx.req.get_uri_args()
-local cookie_jar = {}
-
-
-local function set_cookies(cookie_jar)
-  local vals={}
-  for k,v in pairs(cookie_jar) do table.insert(vals,v) end
-  ngx.header["Set-Cookie"] = vals
-end
-
-local function del_cookie(c, cookie_jar)
-  cookie_jar[c] = c.."=deleted; path=/; Expires=Thu, 01-Jan-1970 00:00:01 GMT"
-  set_cookies(cookie_jar)
-end
-
-local function set_cookie(c, v, cookie_jar, age)
-  age = age or 3000
-  cookie_jar[c] = c.."="..v.."; path=/;Max-Age="..age
-  set_cookies(cookie_jar)
-end
-
 
 -- extract previous token from cookie if it is there
-local access_token = ngx.var.cookie_NGAccessToken or nil
-local authorized = ngx.var.cookie_NGAuthorized or nil
-local auth_user = ngx.var.cookie_NGAuthUser or nil
+local access_token = session.data.access_token or nil
+local authorized = session.data.authorized or nil
 
 if access_token == "" then access_token = nil end
 if authorized ~= "true" then authorized = nil end
-if auth_user == "" then auth_user = nil end
 
-if access_token then set_cookie('NGAccessToken', access_token, cookie_jar) end
-if authorized then set_cookie('NGAuthorized', authorized, cookie_jar) end
-if auth_user then set_cookie('NGAuthUser', auth_user, cookie_jar) end
+if access_token or authorized then session:save() end
 
 -- We have nothing, do it all
 if authorized ~= "true" or not access_token then
@@ -177,14 +190,14 @@ if authorized ~= "true" or not access_token then
 
         -- both the cookie and proxy_pass token retrieval failed
         if not access_token then
-            local redirect_back = ngx.var.cookie_NGRedirectBack or ngx.var.uri
+            local redirect_back = session.data.redirect_back or ngx.var.uri
             redirect_back = (string.match(redirect_back, "/_callback%??.*")) and "/" or redirect_back
             ngx.log(ngx.INFO, block, "redirect_back1=", redirect_back)
 
-            if redirect_back then set_cookie('NGRedirectBack', redirect_back, cookie_jar, 120) end
+            if redirect_back then session.data.redirect_back = redirect_back end
 
             -- Redirect to the /oauth endpoint, request access to ALL scopes
-            set_cookies(cookie_jar)
+            session:save()
             return ngx.redirect(oauth.authorize_url)
         end
     end
@@ -198,21 +211,20 @@ if authorized ~= "true" then
     -- check is we have capability to get user login
     local user_info = oauth.get_user_info(access_token)
     if user_info.status ~= 200 then
-        auth_user = "unknown"
+        session.data.login = "unknown"
     else
-        auth_user = user_info.body.login
+        session.data.login = user_info.body.login
     end
-    set_cookie('NGAuthUser', auth_user, cookie_jar)
 
     -- ensure we have a user with the proper access app-level
     local verify_user_response = oauth.verify_user(access_token)
     if verify_user_response.status ~= 200 then
         -- delete their bad token
-        del_cookie('NGAccessToken', cookie_jar)
+        session.data.access_token = nil
 
         -- Redirect 403 forbidden back to the oauth endpoint, as their stored token was somehow bad
         if verify_user_response.status == 403 then
-            set_cookies(cookie_jar)
+            session:save()
             return ngx.redirect(oauth.authorize_url)
         end
 
@@ -220,41 +232,44 @@ if authorized ~= "true" then
         ngx.status = verify_user_response.status
         ngx.say('{"status": 503, "message": "Error accessing oauth.api for credentials"}')
 
-        set_cookies(cookie_jar)
+        session:save()
         return ngx.exit(ngx.HTTP_OK)
     end
 
     -- Ensure we have the minimum for access_level to this resource
     if verify_user_response.body.access_level < 255 then
         -- Expire their stored token
-        del_cookie('NGAccessToken', cookie_jar)
-        del_cookie('NGAuthorized', cookie_jar)
+        session.data.access_token = nil
+        session.data.authorized = nil
 
         -- Disallow access
         ngx.log(ngx.ERR, "Unauthorized access: ", token)
         ngx.status = ngx.HTTP_UNAUTHORIZED
         ngx.say('{"status": 403, "message": "USER_ID "'..access_token..'" has no access to this resource"}')
 
+        session:save()
         return ngx.exit(ngx.HTTP_OK)
     end
 
     -- Store the access_token within a cookie
-    set_cookie('NGAccessToken', access_token, cookie_jar)
-    set_cookie('NGAuthorized', "true", cookie_jar)
+    session.data.access_token = access_token
+    session.data.authorized = "true"
+    session:save()
 end
 
 -- should be authorized by now
 
 -- Support redirection back to your request if necessary
-local redirect_back = ngx.var.cookie_NGRedirectBack
+local redirect_back = session.data.redirect_back
 ngx.log(ngx.INFO, block, "redirect_back2=", redirect_back)
 
 if redirect_back then
     ngx.log(ngx.INFO, block, "redirect_back3=", redirect_back)
-    del_cookie('NGRedirectBack', cookie_jar)
+    session.data.redirect_back = nil
+    session:save()
     return ngx.redirect(redirect_back)
 end
-ngx.var.auth_user = auth_user or "unknown"
+ngx.var.auth_user = session.data.login or "unknown"
 ngx.log(ngx.INFO, block, "--------------------------------------------------------------------------------")
 
 -- Set some headers for use within the protected endpoint
