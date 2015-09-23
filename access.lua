@@ -212,11 +212,14 @@ if authorized ~= "true" or not access_token then
 
         -- both the cookie and proxy_pass token retrieval failed
         if not access_token then
-            local redirect_back = session.data.redirect_back or ngx.var.uri
-            redirect_back = (string.match(redirect_back, "/_callback%??.*")) and "/" or redirect_back
-            ngx.log(ngx.INFO, block, "redirect_back1=", redirect_back)
-
-            if redirect_back then session.data.redirect_back = redirect_back end
+            if string.match(ngx.var.request_uri, "/_callback%??.*") then
+                session.data.redirect_uri = "/"
+                session.data.redirect_args = nil
+            else
+                session.data.redirect_uri = ngx.var.uri
+                session.data.redirect_args = ngx.var.args
+            end
+            ngx.log(ngx.INFO, block, "redirect_uri1=", session.data.redirect_uri)
 
             -- Redirect to the /oauth endpoint, request access to ALL scopes
             session:save()
@@ -284,14 +287,19 @@ end
 -- should be authorized by now
 
 -- Support redirection back to your request if necessary
-local redirect_back = session.data.redirect_back
-ngx.log(ngx.INFO, block, "redirect_back2=", redirect_back)
+local redirect_uri = session.data.redirect_uri or nil
+local redirect_args = session.data.redirect_args or nil
+ngx.log(ngx.INFO, block, "redirect_uri2=", redirect_uri)
 
-if redirect_back then
-    ngx.log(ngx.INFO, block, "redirect_back3=", redirect_back)
-    session.data.redirect_back = nil
+if redirect_uri then
+    if redirect_args then
+        redirect_uri = redirect_uri.."?"..redirect_args
+    end
+    ngx.log(ngx.INFO, block, "redirect_uri3=", redirect_uri)
+    session.data.redirect_uri = nil
+    session.data.redirect_args = nil
     session:save()
-    return ngx.redirect(redirect_back)
+    return ngx.redirect(redirect_uri)
 end
 ngx.var.auth_user = session.data.login or "unknown"
 ngx.var.auth_email = session.data.email or "unknown"
