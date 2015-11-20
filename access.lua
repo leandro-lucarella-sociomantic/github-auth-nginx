@@ -97,7 +97,7 @@ function oauth.verify_user(access_token)
     local body = response.body
 
     if body.error then
-        return {status=401, message=body.error}
+        return {status=response.status, message=body.error}
     end
 
     for i, org in ipairs(body) do
@@ -249,15 +249,9 @@ if authorized ~= "true" then
         -- delete their bad token
         session.data.access_token = nil
 
-        -- Redirect 403 forbidden back to the oauth endpoint, as their stored token was somehow bad
-        if verify_user_response.status == 403 then
-            session:save()
-            return ngx.redirect(oauth.authorize_url)
-        end
-
         -- Disallow access
         ngx.status = verify_user_response.status
-        ngx.say('{"status": 503, "message": "Error accessing oauth.api for credentials"}')
+        ngx.say('{"status": '..verify_user_response.status..', "message": "'..verify_user_response.message..'"}')
 
         session:save()
         return ngx.exit(ngx.HTTP_OK)
