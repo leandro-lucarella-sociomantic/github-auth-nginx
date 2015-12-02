@@ -26,11 +26,13 @@ local oauth = {
     app_id = ngx.var.oauth_id,
     app_secret = ngx.var.oauth_secret,
     orgs_whitelist = cjson.decode(ngx.var.oauth_orgs_whitelist),
+    teams_whitelist = cjson.decode(ngx.var.oauth_teams_whitelist),
 
     scope = ngx.var.oauth_scope,
     authorize_base_url = github_uri.."/login/oauth/authorize",
     access_token_url = github_uri.."/login/oauth/access_token",
     user_orgs_url = github_api_uri.."/user/orgs",
+    user_teams_url = github_api_uri.."/user/teams",
     user_url = github_api_uri.."/user",
 }
 
@@ -105,7 +107,30 @@ function oauth.verify_user(access_token)
 
         if oauth.orgs_whitelist[org.login] then
             ngx.log(ngx.INFO, block, org.login, " is in orgs_whitelist")
-            return {status=200, body={access_token=access_token, org=org, access_level=9001}}
+
+            -- if no teams whitelist was specified, then is authorized
+            if next(oauth.teams_whitelist) == nil then
+                return {status=200, body={access_token=access_token, org=org, access_level=9001}}
+            end
+
+            -- Check team
+            local params = {access_token=access_token}
+            local url_string = oauth.user_orgs_url.."?"..ngx.encode_args(params)
+            local response = oauth.get(url_string)
+            local tbody = response.body
+            if tbody.error then
+                return {status=response.status, message=tbody.error}
+            end
+
+            for i, team in ipairs(tbody) do
+                ngx.log(ngx.INFO, block, "\ttesting: ", team.slug)
+
+                if oauth.teams_whitelist[team.slug] then
+                    ngx.log(ngx.INFO, block, team.slug, " is in teams_whitelist")
+
+                    return {status=200, body={access_token=access_token, org=org, team=team, access_level=9001}}
+                end
+            end
         end
     end
 

@@ -25,15 +25,17 @@ Before you push the nginx server you need to set the following nginx vars:
 - ``$oauth_id`` Github client id
 - ``$oauth_secret`` Github client secret
 - ``$oauth_orgs_whitelist`` Github org to allow to access the app
+- ``$oauth_teams_whitelist`` Github teams to allow to access the app
 - ``$oauth_scope`` Github scope access for oauth token
 
 You set these values on your instance by as such.
 
 ```nginx
-set $oauth_id             'MY_GITHUB_APP_ID';
-set $oauth_secret         'MY_GITHUB_APP_SECRET';
-set $oauth_orgs_whitelist '{"MY_GITHUB_ORG": true}';
-set $oauth_scope          'repo,user,user:email';
+set $oauth_id              'MY_GITHUB_APP_ID';
+set $oauth_secret          'MY_GITHUB_APP_SECRET';
+set $oauth_orgs_whitelist  '{"MY_GITHUB_ORG": true}';
+set $oauth_teams_whitelist '{"MY_GITHUB_TEAM": true}';
+set $oauth_scope           'repo,user,user:email';
 ```
 
 If you just want a simple test, it's pretty straightforward.
